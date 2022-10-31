@@ -31,5 +31,11 @@
 *.out
 *.app
 
-# Other
+# Video files
+*.mp4
+
+# MacOS
 *.DS_Store
+
+# VSCode
+*.vscode
