@@ -15,9 +15,9 @@ find_package(OpenMP)
 # executables #
 ###############
 
-add_executable( OpenCV_naive_stereo src/main.cpp )
-target_link_libraries( OpenCV_naive_stereo ${OpenCV_LIBS} )
+add_executable( stereo_compute src/main.cpp )
+target_link_libraries( stereo_compute ${OpenCV_LIBS} )
 
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(OpenCV_naive_stereo OpenMP::OpenMP_CXX)
+    target_link_libraries(stereo_compute OpenMP::OpenMP_CXX)
 endif()

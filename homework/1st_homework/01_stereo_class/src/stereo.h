@@ -7,6 +7,7 @@
 #include <fstream>
 #include <sstream>
 
+
 struct stereo_params
     {
         // Camera setup parameters
@@ -19,8 +20,7 @@ struct stereo_params
         int window_size;
         // TODO: Why do we use lambda as float?
         // Have default params for lambda
-        float lambda_start = 0.0;
-        float lambda_stop = 100.0;
+        float lambda = 100.0;
     };
 
 class StereoCompute
@@ -28,22 +28,30 @@ class StereoCompute
 private:
     cv::Mat image1;
     cv::Mat image2;
+    int width, height;
     stereo_params params;
+
 public:
+    std::string output_name;
+
     StereoCompute(cv::Mat in_image1, cv::Mat in_image2, stereo_params in_params);
 
     // Put the public methods
     void getData(cv::Mat in_image1, cv::Mat in_image2, stereo_params in_params);
 
-    cv::Mat getStereoNaive();
+    cv::Mat getStereoNaive(void);
 
-    cv::Mat getStereoDynamic();
+    cv::Mat getStereoDynamic(void);
 
-    std::stringstream getPointCloud(cv::Mat disparityMatrix);
+    void computeStereoNaive(void);
 
-    void getOrientedPointCloud(cv::Mat disparityMatrix);
+    void computeStereoDynamic(void);
 
-    void saveImage(std::string file_name);
+    void computePointCloud(void);
+
+    std::stringstream getPointCloud(cv::Mat disparity_matrix, std::string file_name);
+
+    void saveImage(cv::Mat image, std::string file_name);
 
     void viewImage(cv::Mat image);
 
