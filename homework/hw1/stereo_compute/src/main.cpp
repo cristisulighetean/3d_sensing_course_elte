@@ -131,7 +131,7 @@ StereoCompute::StereoCompute(cv::Mat in_image1, cv::Mat in_image2, stereo_params
 
 
 /**
- * Initializes the object with the 2 images and the parameters
+ * @brief Initializes the object with the 2 images and the parameters
  *
  * @param[in]   image1 image1 data
  * @param[in]   image2 image1 data
@@ -150,8 +150,8 @@ void StereoCompute::getData(cv::Mat in_image1, cv::Mat in_image2, stereo_params 
 
 
 /**
- * Calculates the disparity matrix based on the 
- * naive approach
+ *  @brief Calculates the disparity matrix based on 
+ * the naive approach
  *
  * @return      naive_disp  matrix of disparities
  */
@@ -209,8 +209,8 @@ cv::Mat StereoCompute::getStereoNaive()
 
 
 /**
- * Calculates the disparity matrix based on the 
- * dynamic approach
+ * @brief Calculates the disparity matrix based on 
+ * the dynamic approach
  *
  * @return      dynamic_disp  matrix of disparities
  */
@@ -345,7 +345,7 @@ cv::Mat StereoCompute::getStereoDynamic()
 }
 
 /**
- * Calculates pointcloud from the disparity matrix
+ * @brief Calculates pointcloud from the disparity matrix
  *
  * @param[in]   disparity_matrix
  * @return point cloud as std::stringstream (.xyz format)
@@ -386,7 +386,7 @@ std::stringstream StereoCompute::getPointCloud(cv::Mat disparity_matrix, std::st
 
 
 /**
- * Entire process of calculating disparities via
+ * @brief Entire process of calculating disparities via
  * the naive approach
  * 
  */
@@ -406,7 +406,7 @@ void StereoCompute::computeStereoNaive(void)
 
 
 /**
- * Entire process of calculating disparities via
+ * @brief Entire process of calculating disparities via
  * the dynamic approach
  * 
  */
@@ -426,7 +426,7 @@ void StereoCompute::computeStereoDynamic()
 
 
 /**
- * Computing and saving point cloud using disparities from the naive 
+ * @brief Computing and saving point cloud using disparities from the naive 
  * approach
  * 
  */
@@ -439,7 +439,7 @@ void StereoCompute::computePointCloud(void)
 
 
 /**
- * Saves cv::Mat image as a file with name file_name  
+ * @brief Saves cv::Mat image as a file with name file_name  
  *
  * @param[in]   image cv::Mat
  * @param[in]   file_name std::string
