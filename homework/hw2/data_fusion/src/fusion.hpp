@@ -6,8 +6,6 @@
 /**
  * Creates a gaussian kernel based on a window size and sigma
  * 
- * Source:
- *
  * @param[in]   window_size int
  * @param[in]   sigma float
  * 
