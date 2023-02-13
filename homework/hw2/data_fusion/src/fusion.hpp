@@ -13,25 +13,30 @@
  */
 cv::Mat createGaussianKernel(int window_size, float sigma = 1)
 {
-	cv::Mat kernel(window_size, window_size, CV_32FC1);
-	double i, j, sum = 0.0;
+    // Initialize the kernel with size window_size x window_size, of type float
+    cv::Mat kernel(window_size, window_size, CV_32FC1);
+    double sum = 0.0;
 
-    /* Go over the window*/
-	for (i = 0; i < window_size; i++) {
-		for (j = 0; j < window_size; j++) {
-			kernel.at<float>(i, j) = exp(-(i * i + j * j) / (2 * sigma * sigma)) / (2 * M_PI * sigma * sigma);
-			sum += kernel.at<float>(i, j);
-		}
-	}
+    // Calculate the Gaussian kernel values based on the window size and sigma
+    for (int i = 0; i < window_size; i++) {
+        for (int j = 0; j < window_size; j++) {
+            double exp_term = -(i * i + j * j) / (2 * sigma * sigma);
+            double gaussian_value = exp(exp_term) / (2 * M_PI * sigma * sigma);
+            kernel.at<float>(i, j) = gaussian_value;
+            sum += gaussian_value;
+        }
+    }
 
-	for (i = 0; i < window_size; i++) {
-		for (j = 0; j < window_size; j++) {
-			kernel.at<float>(i, j) /= sum;
-		}
-	}
+    // Normalize the values of the kernel to sum up to 1
+    for (int i = 0; i < window_size; i++) {
+        for (int j = 0; j < window_size; j++) {
+            kernel.at<float>(i, j) /= sum;
+        }
+    }
 
-	return kernel;
+    return kernel;
 }
+
 
 
 /**
@@ -44,35 +49,49 @@ cv::Mat createGaussianKernel(int window_size, float sigma = 1)
  */
 cv::Mat applyGausianFilter(const cv::Mat& image)
 {
-	cv::Mat output(image.size(), image.type());
-	const auto width = image.cols;
-	const auto height = image.rows;
-	const int window_size = 5;
-	cv::Mat gaussianKernel = createGaussianKernel(window_size);
-	for (int r = 0; r < height; ++r) {
-		for (int c = 0; c < width; ++c) {
-			output.at<uchar>(r, c) = 0;
-		}
-	}
-
-	for (int r = window_size / 2; r < height - window_size / 2; ++r) {
-		for (int c = window_size / 2; c < width - window_size / 2; ++c) {
-
-			int sum = 0;
-			for (int i = -window_size / 2; i <= window_size / 2; ++i) {
-				for (int j = -window_size / 2; j <= window_size / 2; ++j) {
-					sum += image.at<uchar>(r + i, c + j) * 
+    // Output image with the same size and type as the input
+    cv::Mat output(image.size(), image.type());
+    
+    // Get image width and height
+    const auto width = image.cols;
+    const auto height = image.rows;
+    
+    // Gaussian window size
+    const int window_size = 5;
+    
+    // Create a Gaussian kernel
+    cv::Mat gaussianKernel = createGaussianKernel(window_size);
+    
+    // Initialize the output image to 0
+    for (int r = 0; r < height; ++r) {
+        for (int c = 0; c < width; ++c) {
+            output.at<uchar>(r, c) = 0;
+        }
+    }
+    
+    // Go over the image
+    for (int r = window_size / 2; r < height - window_size / 2; ++r) {
+        for (int c = window_size / 2; c < width - window_size / 2; ++c) {
+            
+            // Convolve the current pixel with the Gaussian kernel
+            int sum = 0;
+            for (int i = -window_size / 2; i <= window_size / 2; ++i) {
+                for (int j = -window_size / 2; j <= window_size / 2; ++j) {
+                    sum += image.at<uchar>(r + i, c + j) * 
                     gaussianKernel.at<float>(i + window_size / 2, j + window_size / 2);
-				}
-			}
-			output.at<uchar>(r, c) = sum;
-		}
-	}
-	return output;
+                }
+            }
+            
+            // Store the result in the output image
+            output.at<uchar>(r, c) = sum;
+        }
+    }
+    
+    return output;
 }
 
 /**
- * Apply gaussian filter to an image 
+ * Apply bilateral filter to an image 
  *
  * @param[in]   image cv::Mat
  * @param[in]   window_size const int
@@ -82,57 +101,68 @@ cv::Mat applyGausianFilter(const cv::Mat& image)
  * @returns     output filtered image
  */
 cv::Mat applyBilateralFilter(const cv::Mat& image, 
-                            const int window_size = 5, 
-                            float spatial_sigma = 1, 
-                            float spectral_sigma = 5)
+                            int window_size, 
+                            float spatial_sigma, 
+                            float spectral_sigma)
 {
-	const auto width = image.cols;
-	const auto height = image.rows;
-	cv::Mat output(image.size(), image.type());
+    // Get image size
+    const int width = image.cols;
+    const int height = image.rows;
 
-	cv::Mat gaussianKernel = createGaussianKernel(window_size, spatial_sigma); // sigma for the spatial filter (Gaussian, \(w_G\) kernel)
+    // Create the output matrix with the same size and type as the input image
+    cv::Mat output(image.size(), image.type());
 
-	for (int r = 0; r < height; ++r) {
-		for (int c = 0; c < width; ++c) {
-			output.at<uchar>(r, c) = 0;
-		}
-	}
+    // Create the Gaussian spatial filter kernel
+    cv::Mat gaussianKernel = createGaussianKernel(window_size, spatial_sigma);
 
-	auto d = [](float a, float b) {
-		return std::abs(a - b);
-	};
+    // Clear the output matrix with zeros
+    for (int r = 0; r < height; ++r) {
+        for (int c = 0; c < width; ++c) {
+            output.at<uchar>(r, c) = 0;
+        }
+    }
 
-	 /* use of weighting function p : dissimilar pixels get lower weights, 
-	 								preserves strong edges, smooths other regions */
-	auto p = [](float val, float sigma) {
-		const float sigmaSq = sigma * sigma;
-		const float normalization = std::sqrt(2 * M_PI) * sigma;
-		return (1 / normalization) * std::exp(-val / (2 * sigmaSq));
-	};
+    // Function to calculate the absolute difference between two values
+    auto range_difference = [](float a, float b) {
+        return std::abs(a - b);
+    };
 
-	for (int r = window_size / 2; r < height - window_size / 2; ++r) {
-		for (int c = window_size / 2; c < width - window_size / 2; ++c) {
+    // Function to calculate the weight for each pixel based on its range difference and sigma
+    auto weighting_function = [](float val, float sigma) {
+        const float sigmaSq = sigma * sigma;
+        const float normalization = std::sqrt(2 * M_PI) * sigma;
+        return (1 / normalization) * std::exp(-val / (2 * sigmaSq));
+    };
 
-			float sum_w = 0;
-			float sum = 0;
+    // Apply the bilateral filter
+    for (int r = window_size / 2; r < height - window_size / 2; ++r) {
+        for (int c = window_size / 2; c < width - window_size / 2; ++c) {
 
-			for (int i = -window_size / 2; i <= window_size / 2; ++i) {
-				for (int j = -window_size / 2; j <= window_size / 2; ++j) {
+            // Variables to store the sum of weighted values and the sum of weights
+            float sum_w = 0;
+            float sum = 0;
 
-					float range_difference = d(image.at<uchar>(r, c), image.at<uchar>(r + i, c + j));
+            // Apply the filter for each pixel in the window
+            for (int i = -window_size / 2; i <= window_size / 2; ++i) {
+                for (int j = -window_size / 2; j <= window_size / 2; ++j) {
 
-					float w
-						= p(range_difference, spectral_sigma) // spectral filter
-						* gaussianKernel.at<float>(i + window_size / 2, j + window_size / 2); // spatial filter
+                    // Calculate the range difference (range kernel) between the center pixel and the current pixel
+                    float range_difference = range_difference(image.at<uchar>(r, c), image.at<uchar>(r + i, c + j));
 
-					sum += image.at<uchar>(r + i, c + j) * w;
-					sum_w += w;
-				}
-			}
-			output.at<uchar>(r, c) = sum / sum_w;
-		}
-	}
-	return output;
+                    // Calculate the weight for the current pixel
+                    float w = weighting_function(range_difference, spectral_sigma) * gaussianKernel.at<float>(i + window_size / 2, j + window_size / 2);
+
+                    // Accumulate the weighted values and the weights
+                    sum += image.at<uchar>(r + i, c + j) * w;
+                    sum_w += w;
+                }
+            }
+
+            // Calculate the weighted average for the center pixel
+            output.at<uchar>(r, c) = sum / sum_w;
+        }
+    }
+    return output;
 }
 
 
@@ -147,24 +177,23 @@ cv::Mat applyBilateralFilter(const cv::Mat& image,
  * 
  * @returns     resized_image  
  */
-cv::Mat applyJointBilateralFilter(const cv::Mat& input_rgb, 
-                        const cv::Mat& input_depth, 
-                        cv::Mat& output, 
-                        const int window_size = 5, 
-                        float sigma = 5)
+cv::Mat applyJointBilateralFilter(const cv::Mat& input_rgb, const cv::Mat& input_depth, cv::Mat& output, 
+            const int window_size, float sigma)
 {
-	// converting the bilateral filter to Guided Joint bilateral filter for guided image upsampling 
-	// upsampling a low resolution depth image, guided by an RGB image
-	// weights formed using colors (image input_rgb), filtering happens by modifying depth (image input_depth)
-	const auto width = input_rgb.cols;
-	const auto height = input_rgb.rows;
+	// convert bilateral filter to Guided Joint bilateral filter for guided image upsampling 
+	// upsample low resolution depth image guided by RGB image
+	// form weights using colors (input_rgb) and filter by modifying depth (input_depth)
+	const int width = input_rgb.cols;
+	const int height = input_rgb.rows;
 
-	cv::Mat gaussianKernel = createGaussianKernel(window_size, 0.5); // sigma for the spatial filter (Gaussian, \(w_G\) kernel)
-	auto d = [](float a, float b) {
+	cv::Mat gaussianKernel = createGaussianKernel(window_size, 0.5); // spatial filter sigma
+
+	auto range_difference = [](float a, float b) {
 		return std::abs(a - b);
 	};
 
-	auto p = [](float val, float sigma) {	// use of weighting function p : dissimilar pixels get lower weights, preserves strong edges, smooths other regions
+	auto weighting_function = [](float val, float sigma) {	
+		// assign lower weight to dissimilar pixels, preserve strong edges, smooth other regions
 		const float sigmaSq = sigma * sigma;
 		const float normalization = std::sqrt(2 * M_PI) * sigma;
 		return (1 / normalization) * std::exp(-val / (2 * sigmaSq));
@@ -179,13 +208,11 @@ cv::Mat applyJointBilateralFilter(const cv::Mat& input_rgb,
 			for (int i = -window_size / 2; i <= window_size / 2; ++i) {
 				for (int j = -window_size / 2; j <= window_size / 2; ++j) {
 
-					float range_difference
-						= d(input_rgb.at<uchar>(r, c), input_rgb.at<uchar>(r + i, c + j)); // using the rgb image with the spectral filter
+					float rd = range_difference(input_rgb.at<uchar>(r, c), input_rgb.at<uchar>(r + i, c + j)); // use RGB image with spectral filter
 
-					float w = p(range_difference, sigma) // sigma for the spectral filter (\(f\) in the slides
-						* gaussianKernel.at<float>(i + window_size / 2, j + window_size / 2);
+					float w = weighting_function(rd, sigma) * gaussianKernel.at<float>(i + window_size / 2, j + window_size / 2);
 
-					sum += input_depth.at<uchar>(r + i, c + j) * w; // using the depth image with the spatial filter
+					sum += input_depth.at<uchar>(r + i, c + j) * w; // use depth image with spatial filter
 					sum_w += w;
 				}
 			}
@@ -197,28 +224,45 @@ cv::Mat applyJointBilateralFilter(const cv::Mat& input_rgb,
 
 
 /**
- * Perform upsampling on an RGB image using the depth map
+ * Perform Iterative upsampling on an RGB image using the depth map
+ * Algorithm is performed according to the pseudo-code representation
+ * in Lecture 4
  *
  * @param[in]   input_rgb cv::Mat
  * @param[in]   input_depth cv::Mat
  * 
  * @returns     D output image  
  */
-cv::Mat performUpsampling(const cv::Mat& input_rgb, 
-                        const cv::Mat& input_depth)
+cv::Mat performIterativeUpsampling(const cv::Mat& input_rgb, const cv::Mat& input_depth)
 {
-	// applying the joint bilateral filter to upsample a depth image, guided by an RGB image -- iterative upsampling
-	int uf = log2(input_rgb.rows / input_depth.rows); // upsample factor
-	cv::Mat D = input_depth.clone(); // lowres depth image
-	cv::Mat I = input_rgb.clone(); // highres rgb image
+	// Logarithmic upsample factor
+	int uf = log2(input_rgb.rows / input_depth.rows);
+
+	// Low-resolution depth image
+	cv::Mat D = input_depth.clone(); 
+
+	// High-resolution RGB image
+	cv::Mat I = input_rgb.clone(); 
+
+	// Iteratively applying the joint bilateral filter
 	for (int i = 0; i < uf; ++i)
 	{
-		cv::resize(D, D, D.size() * 2); // doubling the size of the depth image
-		cv::resize(I, I, D.size());		// resizing the rgb image to depth image size
-		applyJointBilateralFilter(I, D, D, 5, 0.1); // applying the joint bilateral filter with changed size depth and rbg images
+		// Doubling the size of the depth image
+		cv::resize(D, D, D.size() * 2); 
+
+		// Resizing the RGB image to the depth image size
+		cv::resize(I, I, D.size());
+
+		// Applying the joint bilateral filter with the changed size images
+		applyJointBilateralFilter(I, D, D, 5, 0.1); 
 	}
-	cv::resize(D, D, input_rgb.size()); // in the end resizing the depth image to rgb image size
-	applyJointBilateralFilter(input_rgb, D, D, 5, 0.1); // applying the joint bilateral filter with full res. size images
+	// Resizing the depth image to the RGB image size
+	cv::resize(D, D, input_rgb.size()); 
+
+	// Final application of the joint bilateral filter with full resolution images
+	applyJointBilateralFilter(input_rgb, D, D, 5, 0.1); 
+
+	// Returning the final depth image
 	return D;
 }
 
