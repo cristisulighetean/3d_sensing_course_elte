@@ -271,13 +271,13 @@ To perform the evaluation task, I have used the 2005 Middlebury Stereo dataset w
 The output is arranged as follows: colored image, ground truth (provided by the dataset), naive approach and lastly the dynamic approach.
 
 <p float="left">
-  <img src="./assets/s1/color.png" width="300" />
-  <img src="./assets/s1/gt.png" width="300" /> 
+  <img src="./assets/hw1/s1/color.png" width="300" />
+  <img src="./assets/hw1/s1/gt.png" width="300" /> 
 </p>
 
 <p float="left">
-  <img src="./assets/s1/naive.png" width="300" />
-  <img src="./assets/s1/dp.png" width="300" />
+  <img src="./assets/hw1/s1/naive.png" width="300" />
+  <img src="./assets/hw1/s1/dp.png" width="300" />
 </p>
 
 The best output of the dynamic approach had the follwing parameters:
