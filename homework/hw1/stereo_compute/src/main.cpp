@@ -91,37 +91,33 @@ int main(int argc, char** argv)
   StereoCompute stereo(in_image1, in_image2, params);
   stereo.output_name = argv[4];
 
-  // Handle modes
-  if (mode == 1)
+
+  switch (mode)
   {
+  case 1:
     // Basic naive
     stereo.computeStereoNaive();
-  }
-  else if (mode == 2)
-  {
+    break;
+  case 2:
     // Basic DP
     stereo.computeStereoDynamic();
-  }
-  else if (mode == 3)
-  {
+    break;
+  case 3:
     // Running both modes
     stereo.computeStereoNaive();
     stereo.computeStereoDynamic();
-  }
-  else if (mode == 4)
-  {
+    break;
+  case 4:
     // Point cloud
     stereo.computePointCloud();
-  }
-  else
-  {
+    break;
+  default:
     std::cerr << "Unknown mode...return\n";
     return 1;
   }
 
   return 0;
 }
-
 
 // StereoCompute Constructor
 StereoCompute::StereoCompute(cv::Mat in_image1, cv::Mat in_image2, stereo_params in_params)
@@ -140,7 +136,6 @@ StereoCompute::StereoCompute(cv::Mat in_image1, cv::Mat in_image2, stereo_params
  */
 void StereoCompute::getData(cv::Mat in_image1, cv::Mat in_image2, stereo_params in_params)
 {
-    // TODO perform checks on params
     image1 = in_image1;
     image2 = in_image2;
     height = image1.size().height;
@@ -158,7 +153,6 @@ void StereoCompute::getData(cv::Mat in_image1, cv::Mat in_image2, stereo_params 
 cv::Mat StereoCompute::getStereoNaive()
 {
     cv::Mat naive_disp = cv::Mat::zeros(height, width, CV_8UC1);
-
     int half_window_size = params.window_size / 2;
     int progress = 0;
   
@@ -188,7 +182,6 @@ cv::Mat StereoCompute::getStereoNaive()
 
                         int pixel_1 = image1.at<uchar>(i + v, j + u);
                         int pixel_2 = image2.at<uchar>(i + v, j + u + d);
-
                         ssd += (pixel_1-pixel_2)*(pixel_1-pixel_2);
                     }
                 }
@@ -223,7 +216,7 @@ cv::Mat StereoCompute::getStereoDynamic()
 
 #pragma omp parallel for
 
-    // for each row (scanline)
+    // for each row (scanline) in the image
     for (int y_0 = half_window_size; y_0 < height - half_window_size; ++y_0) {  
 
 #pragma omp critical
@@ -235,10 +228,14 @@ cv::Mat StereoCompute::getStereoDynamic()
                 << std::flush;
         }
 
-        //dissimilarity (i,j) for each (i,j)
+        /// matrix for storing the dissimilarity between each pair of pixels in the left and right images
         cv::Mat dissim = cv::Mat::zeros(width, width, CV_32FC1);
+
+        // for each pixel in the left image
         for (int i = half_window_size; i < width - half_window_size; ++i) { // left image
-            for (int j = half_window_size; j < width - half_window_size; ++j) { // right image                                         
+            for (int j = half_window_size; j < width - half_window_size; ++j) { // right image    
+
+                // variable to store the sum of absolute differences between the pixels in the matching block                                     
                 float sum = 0;
                 for (int u = -half_window_size; u <= half_window_size; ++u) {    
                     for (int v = -half_window_size; v <= half_window_size; ++v) {    
@@ -255,29 +252,36 @@ cv::Mat StereoCompute::getStereoDynamic()
             }
         }
 
-        cv::Mat C = cv::Mat::zeros(width, width, CV_32FC1);                                                                
+        // matrix for storing the costs of each path
+        cv::Mat C = cv::Mat::zeros(width, width, CV_32FC1);
+        // matrix for storing the best path                                                               
         cv::Mat M = cv::Mat::zeros(width, width, CV_8UC1);    
         
+        // initializing the first row of M
         for (int i = 0; i < width; ++i) {
             M.at<uchar>(0, i) = 2;
         }
-        
+        // initializing the first column of M
         for (int i = 0; i < width; ++i) {
             M.at<uchar>(i, 0) = 1;
         }
         
+        // Dynamic programming step 1
+        // Iterate over width-1 and width-1
         for (int i = 1; i < width; ++i) {
             for (int j = 1; j < width; ++j) {
 
+                // Initialize minimum cost to maximum value possible and index to 0
                 float min = FLT_MAX;
                 int index = 0;
                 float C_eval[3];
 
-
+                // Evaluate cost for three paths, match, left occlusion and right occlusion
                 C_eval[0] = C.at<float>(i - 1, j - 1) + dissim.at<float>(i, j);
                 C_eval[2] = C.at<float>(i, j - 1) + params.lambda;
                 C_eval[1] = C.at<float>(i - 1, j) + params.lambda;
 
+                // Select the path with the minimum cost
                 for (int n = 0; n < 3; ++n) {
                     if (C_eval[n] < min) {
                         min = C_eval[n];
@@ -285,44 +289,50 @@ cv::Mat StereoCompute::getStereoDynamic()
                     }
                 }
 
+                // Update the minimum cost for the current position
                 C.at<float>(i, j) = min;
+
+                // Store the path index with the minimum cost
                 M.at<uchar>(i, j) = index;
             }
         }
-        
+        // Initialize variables for dynamic programming step 2
         int i = width - half_window_size;
         int j = width - half_window_size;
         
+        // Create a zero matrix to store the path
         cv::Mat path = cv::Mat::zeros(2 * width, 2, CV_32SC1);
 
+        // Initialize counter to 0
         int counter = 0;
 
+        // Traceback from the end of the matrix to the beginning
         while (i > half_window_size && j > half_window_size) {
             int val = M.at<uchar>(i, j);
 
+            // Calculate absolute disparity and cap it if over 255
             int disp = std::abs(j - i);
             if (disp > 255) {
                 disp = 255;
             }
 
+            // Store the current position in the path matrix
             path.at<int>(counter, 0) = i;
             path.at<int>(counter, 1) = j;
           
             counter++;
 
-            // match
+            // Case 1: Match
             if (val == 0) {                
                 --i;
                 --j;
                 dynamic_disp.at<uchar>(y_0, j) = disp;
             }
-
-            // left occlusion
+            // Case 2: Left occlusion
             else if (val==1) {      
                 i--;
             }
-
-            // Right occlusion
+            // Case 3: Right occlusion
             else if (val == 2) {
                 j--;
                 dynamic_disp.at<uchar>(y_0, j) = dynamic_disp.at<uchar>(y_0, j + 1);
@@ -330,16 +340,19 @@ cv::Mat StereoCompute::getStereoDynamic()
         }
         counter--;
         
+        // Set the disparity for the remaining points
         for (int i = counter; i > 0; i--) {
             int x = path.at<int>(i, 0);
             int y = path.at<int>(i, 1);
 
+            // if the value in the M matrix at (x, y) is 1
+            // meaning a left occlusion
             if (M.at<uchar>(x, y) == 1) {
-               
-                dynamic_disp.at<uchar>(y_0, y) = dynamic_disp.at<uchar>(y_0, y-1);               
-            }       
+                // set the disparity value in the dynamic_disp matrix 
+                // at (y_0, y) to the value of (y_0, y-1)
+                dynamic_disp.at<uchar>(y_0, y) = dynamic_disp.at<uchar>(y_0, y-1);                      
+            }
         }
-    }
 
     return dynamic_disp;
 }
@@ -441,8 +454,8 @@ void StereoCompute::computePointCloud(void)
 /**
  * @brief Saves cv::Mat image as a file with name file_name  
  *
- * @param[in]   image cv::Mat
- * @param[in]   file_name std::string
+ * @param   image cv::Mat
+ * @param   file_name std::string
  */
 void StereoCompute::saveImage(cv::Mat image, std::string file_name)
 {

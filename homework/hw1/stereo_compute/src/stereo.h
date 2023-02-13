@@ -18,7 +18,6 @@ struct stereo_params
         // Dmin: disparity added due to image cropping
         int dmin;
         int window_size;
-        // TODO: Why do we use lambda as float?
         // Have default params for lambda
         float lambda = 100.0;
     };
